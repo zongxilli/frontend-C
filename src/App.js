@@ -1,24 +1,33 @@
 import './App.css';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Grid, Header, Icon, Image, Input } from 'semantic-ui-react';
+import { Button, Grid, Header, Icon, Image, Input } from 'semantic-ui-react';
 
 function App() {
 	const [data, setData] = useState({ students: [] });
 	const [search, setSearch] = useState('');
 	const [dropdownIdx, setDropdownIdx] = useState(-1);
+	const [addTagIdx, setAddTagIdx] = useState(-1);
+	const [tagName, setTagName] = useState('');
+	const [tagSearch, setTagSearch] = useState('');
+	const [tags, setTags] = useState([]);
 
 	useEffect(() => {
-		const fetchData = async () => {
+		const fetchDataAndInitializeTagsArray = async () => {
 			const { data } = await axios(
 				'https://api.hatchways.io/assessment/students'
 			);
 
 			setData(data);
+
+			let tempArray = new Array(data.students.length).fill('');
+			setTags(tempArray);
 		};
 
-		fetchData();
-	}, [search]);
+		fetchDataAndInitializeTagsArray();
+
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const getAverage = (array) => {
 		return (
@@ -29,6 +38,25 @@ function App() {
 	const dropdownIndexControl = (curr) => {
 		if (curr === dropdownIdx) setDropdownIdx(-1);
 		else setDropdownIdx(curr);
+	};
+
+	const addTagIndexControl = (curr) => {
+		if (curr === addTagIdx) setAddTagIdx(-1);
+		else {
+			setTagName('');
+			setAddTagIdx(curr);
+		}
+	};
+
+	const onSubmitHandler = (e) => {
+		e.preventDefault();
+
+		let tempArray = [...tags];
+		tempArray[addTagIdx] = tagName;
+		setTags(tempArray);
+
+		setTagName('');
+		setAddTagIdx(-1);
 	};
 
 	return (
@@ -46,14 +74,23 @@ function App() {
 				style={{ height: '5vh' }}
 				onChange={(e) => setSearch(e.target.value)}
 			/>
-			<Input fluid placeholder='Search by tag' style={{ height: '5vh' }} />
+			<Input
+				fluid
+				placeholder='Search by tag'
+				value={tagSearch}
+				style={{ height: '5vh' }}
+				onChange={(e) => setTagSearch(e.target.value)}
+			/>
 
 			<div style={{ marginTop: '2vh' }}>
 				{data.students
 					.filter(
-						(student) =>
-							student.firstName.toUpperCase().includes(search.toUpperCase()) ||
-							student.lastName.toUpperCase().includes(search.toUpperCase())
+						(student, index) =>
+							(student.firstName.toUpperCase().includes(search.toUpperCase()) ||
+								student.lastName
+									.toUpperCase()
+									.includes(search.toUpperCase())) &&
+							tags[index]?.toUpperCase().includes(tagSearch.toUpperCase())
 					)
 					.map((student, index) => (
 						<Grid key={student.id} floated='right'>
@@ -65,16 +102,38 @@ function App() {
 									style={{ marginLeft: '3vw', border: '1px solid lightgrey' }}
 								/>
 							</Grid.Column>
+
 							<Grid.Column width={10}>
 								<Header as='h1'>
 									{student.firstName.toUpperCase()}{' '}
 									{student.lastName.toUpperCase()}
-									<Header.Subheader>{student.email}</Header.Subheader>
-									<Header.Subheader>{student.company}</Header.Subheader>
-									<Header.Subheader>skill {student.skill}</Header.Subheader>
+									<Header.Subheader>Email: {student.email}</Header.Subheader>
 									<Header.Subheader>
-										average {getAverage(student.grades)} %
+										Company: {student.company}
 									</Header.Subheader>
+									<Header.Subheader>Skill: {student.skill}</Header.Subheader>
+									<Header.Subheader>
+										Average: {getAverage(student.grades)} %
+									</Header.Subheader>
+									{search === '' && tagSearch === '' && (
+										<Header.Subheader style={{ marginTop: '1vh' }}>
+											<Button
+												content={index === addTagIdx ? 'Close' : 'Add tag'}
+												onClick={() => addTagIndexControl(index)}
+											/>
+										</Header.Subheader>
+									)}
+									{index === addTagIdx && (
+										<Header.Subheader>
+											<form onSubmit={(e) => onSubmitHandler(e)}>
+												<Input
+													placeholder='Tag name'
+													value={tagName}
+													onChange={(e) => setTagName(e.target.value)}
+												/>
+											</form>
+										</Header.Subheader>
+									)}
 								</Header>
 								{index === dropdownIdx &&
 									student.grades.map((score, index) => (
@@ -88,6 +147,7 @@ function App() {
 										</div>
 									))}
 							</Grid.Column>
+
 							<Grid.Column width={2}>
 								<Icon
 									name={index === dropdownIdx ? 'minus' : 'add'}
